@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -16,113 +15,79 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * @package    moodle
- * @subpackage registration
- * @author     Jerome Mouneyrac <jerome@mouneyrac.com>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL
- * @copyright  (C) 1999 onwards Martin Dougiamas  http://dougiamas.com
+ * A page displaying the user's contacts and messages
  *
- * This page displays the site registration form.
- * It handles redirection to the hub to continue the registration workflow process.
- * It also handles update operation by web service.
+ * @package    core_message
+ * @copyright  2010 Andrew Davis
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once('../../config.php');
-require_once($CFG->libdir . '/adminlib.php');
+require_once('../config.php');
 
-admin_externalpage_setup('registrationmoodleorg');
+require_login(null, false);
 
-$unregistration = optional_param('unregistration', false, PARAM_BOOL);
-$confirm = optional_param('confirm', false, PARAM_BOOL);
+if (isguestuser()) {
+    redirect($CFG->wwwroot);
+}
 
-if ($unregistration && \core\hub\registration::is_registered()) {
-    if ($confirm) {
-        require_sesskey();
-        \core\hub\registration::unregister(false, false);
+if (empty($CFG->messaging)) {
+    print_error('disabled', 'message');
+}
 
-        if (!\core\hub\registration::is_registered()) {
-            redirect(new moodle_url('/admin/registration/index.php'));
-        }
+// The id of the user we want to view messages from.
+$id = optional_param('id', 0, PARAM_INT);
+$view = optional_param('view', null, PARAM_ALPHANUM);
+// It's possible a user may come from a link where these parameters are specified.
+// We no longer support viewing another user's messaging area (that can be achieved
+// via the 'Log-in as' feature). The 'user2' value takes preference over 'id'.
+$userid = optional_param('user2', $id, PARAM_INT);
+$conversationid = optional_param('convid', null, PARAM_INT);
+
+if (!core_user::is_real_user($userid)) {
+    $userid = null;
+}
+// You can specify either a user, or a conversation, not both.
+if ($userid) {
+    $conversationid = \core_message\api::get_conversation_between_users([$USER->id, $userid]);
+} else if ($conversationid) {
+    // Check that the user belongs to the conversation.
+    if (!\core_message\api::is_user_in_conversation($USER->id, $conversationid)) {
+        $conversationid = null;
     }
-
-    echo $OUTPUT->header();
-    echo $OUTPUT->confirm(
-        get_string('registerwithmoodleorgremove', 'core_hub'),
-        new moodle_url(new moodle_url('/admin/registration/index.php', ['unregistration' => 1, 'confirm' => 1])),
-        new moodle_url(new moodle_url('/admin/registration/index.php'))
-    );
-    echo $OUTPUT->footer();
-    exit;
 }
 
-$isinitialregistration = \core\hub\registration::show_after_install(true);
-if (!$returnurl = optional_param('returnurl', null, PARAM_LOCALURL)) {
-    $returnurl = $isinitialregistration ? '/admin/index.php' : '/admin/registration/index.php';
-}
-
-$siteregistrationform = new \core\hub\site_registration_form();
-$siteregistrationform->set_data(['returnurl' => $returnurl]);
-if ($fromform = $siteregistrationform->get_data()) {
-
-    // Save the settings.
-    \core\hub\registration::save_site_info($fromform);
-
-    if (\core\hub\registration::is_registered()) {
-        if (\core\hub\registration::update_manual()) {
-            redirect(new moodle_url($returnurl));
-        }
-        redirect(new moodle_url('/admin/registration/index.php', ['returnurl' => $returnurl]));
-    } else {
-        \core\hub\registration::register($returnurl);
-        // This method will redirect away.
+if ($userid) {
+    if (!\core_message\api::can_send_message($userid, $USER->id)) {
+        throw new moodle_exception('Can not contact user');
     }
-
 }
 
-// OUTPUT SECTION.
+$url = new moodle_url('/message/index.php');
+if ($userid) {
+    $url->param('id', $userid);
+}
+$PAGE->set_url($url);
+$PAGE->set_context(context_user::instance($USER->id));
+$PAGE->set_pagelayout('mydashboard');
+
+$strmessages = get_string('messages', 'message');
+
+$PAGE->set_title("$strmessages");
+$PAGE->set_heading("$strmessages");
+
+// Remove the user node from the main navigation for this page.
+$usernode = $PAGE->navigation->find('users', null);
+$usernode->remove();
+
+$settings = $PAGE->settingsnav->find('messages', null);
+$settings->make_active();
 
 echo $OUTPUT->header();
-
-// Current status of registration.
-
-$notificationtype = \core\output\notification::NOTIFY_ERROR;
-if (\core\hub\registration::is_registered()) {
-    $lastupdated = \core\hub\registration::get_last_updated();
-    if ($lastupdated == 0) {
-        $registrationmessage = get_string('pleaserefreshregistrationunknown', 'admin');
-    } else if (\core\hub\registration::get_new_registration_fields()) {
-        $registrationmessage = get_string('pleaserefreshregistrationnewdata', 'admin');
-    } else {
-        $lastupdated = userdate($lastupdated, get_string('strftimedate', 'langconfig'));
-        $registrationmessage = get_string('pleaserefreshregistration', 'admin', $lastupdated);
-        $notificationtype = \core\output\notification::NOTIFY_INFO;
-    }
-    echo $OUTPUT->notification($registrationmessage, $notificationtype);
-} else if (!$isinitialregistration) {
-    $registrationmessage = get_string('registrationwarning', 'admin');
-    echo $OUTPUT->notification($registrationmessage, $notificationtype);
+// Display a message if the messages have not been migrated yet.
+if (!get_user_preferences('core_message_migrate_data', false)) {
+    $notify = new \core\output\notification(get_string('messagingdatahasnotbeenmigrated', 'message'),
+        \core\output\notification::NOTIFY_WARNING);
+    echo $OUTPUT->render($notify);
 }
-
-// Heading.
-if (\core\hub\registration::is_registered()) {
-    echo $OUTPUT->heading(get_string('registerwithmoodleorgupdate', 'core_hub'));
-} else if ($isinitialregistration) {
-    echo $OUTPUT->heading(get_string('registerwithmoodleorgcomplete', 'core_hub'));
-} else {
-    echo $OUTPUT->heading(get_string('registerwithmoodleorg', 'core_hub'));
-}
-
-$renderer = $PAGE->get_renderer('core', 'admin');
-echo $renderer->moodleorg_registration_message();
-
-$siteregistrationform->display();
-
-if (\core\hub\registration::is_registered()) {
-    // Unregister link.
-    $unregisterhuburl = new moodle_url("/admin/registration/index.php", ['unregistration' => 1]);
-    echo html_writer::div(html_writer::link($unregisterhuburl, get_string('unregister', 'hub')), 'unregister mt-2');
-} else if ($isinitialregistration) {
-    echo html_writer::div(html_writer::link(new moodle_url($returnurl), get_string('skipregistration', 'hub')),
-        'skipregistration mt-2');
-}
+echo \core_message\helper::render_messaging_widget(false, $userid, $conversationid, $view);
 echo $OUTPUT->footer();
