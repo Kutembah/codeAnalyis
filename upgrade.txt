@@ -1,36 +1,47 @@
-This files describes API changes for code that uses the user API.
-
-=== 4.0 ===
-
-* External function core_user_external::update_users() will now fail on a per user basis. Previously if one user
-  update failed all users in the operation would fail.
-* External function core_user_external::update_users() now returns an error code and message to why a user update
-  action failed.
-* New method `core_user\fields::get_sql_fullname` for retrieving user fullname format in SQL statement
+This files describes API changes in /admin/*.
 
 === 3.11 ===
 
-* Added new core_user/form_user_selector JS module that can be used as the 'ajax' handler for the autocomplete form
-  element implementing the user selector.
-* Added new external function core_user_external::search_identity(). The main purpose of this external function is to
-  provide data for asynchronous user selectors and similar widgets. It allows to search users matching the given query
-  in their name or other available identity fields.
+* New admin setting admin_setting_encryptedpassword allows passwords in admin settings to be
+  encrypted (with the new \core\encryption API) so that even the admin cannot read them.
+* Web services administration has been moved from Plugins into the Server category. If you have
+  Behat tests containing steps like `Given I navigate to "Plugins > Web services > ..."`, you will
+  want to replace them with `Given I navigate to "Server > Web services > ..."`.
 
 === 3.9 ===
 
-* The unified filter has been replaced by the participants filter. The following have therefore been deprecated:
-  * Library functions:
-    * user_get_participants_sql
-    * user_get_total_participants
-    * user_get_participants
-  * Unified filter renderer (core_user_renderer::unified_filter)
-  * Unified filter renderable (\core_user\output\unified_filter)
-  * Unified filter JavaScript (core_user/unified_filter.js and core_user/unified_filter_datasource.js)
-  * Unified filter template (unified_filter.mustache)
+* The following functions, previously used (exclusively) by upgrade steps are not available anymore because of the upgrade cleanup performed for this version. See MDL-65809 for more info:
+    - upgrade_fix_block_instance_configuration()
+    - upgrade_theme_is_from_family()
+    - upgrade_find_theme_location()
+    - linkcoursesectionsupgradescriptwasrun setting
+    - upgrade_block_positions()
 
-=== 3.6 ===
+=== 3.8 ===
 
-* The following functions have been finally deprecated and can not be used anymore:
-  * useredit_update_picture()
-* core_user_external::update_user_preferences() now allows to unset existing preferences values.
-  If the preference value field is not set, the preference will be unset.
+* Admin setting "Open to Google" (opentogoogle) has been renamed to the more generic "Open to search engines" (opentowebcrawlers).
+  This is a more accurate representation of what is being set and the config string has also been moved and updated to reflect this.
+
+=== 3.7 ===
+
+* Admin setting "Allow blocks to use the dock" (allowblockstodock) has been removed & stings deprecated.
+  Docking of blocks is no longer supported within the core themes (Boost, Classic).
+  Please see MDL-64506 for further details.
+
+=== 3.3 ===
+
+* The admin settings admin_setting_configselect and admin_setting_configmultiselect now support the optgroup tag.
+  Grouping of options can be created with this new tag.
+  For using it, the option parameters needs the Group names as indexes:
+  [
+    "Spain" =>  ["madrid" => "Madrid", "barcelona" => "Barcelona"],
+    "France" => ["paris" => "Paris", "marseille" => "Marseille"],
+  ]
+
+=== 3.2 ===
+
+* Admin settings have been refined to better support right-to-left languages. In RTL,
+  most fields should not have their direction flipped, a URL, a path to a file, ...
+  are always displayed LTR. The admin setting will now best guess if they should be
+  RTLized based on their PARAM_* type. To override that guess, use
+  admin_setting::set_force_ltr(true/false).

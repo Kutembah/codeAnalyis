@@ -15,10 +15,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Edit user message preferences
+ * Edit user notification preferences
  *
  * @package    core_message
- * @copyright  2008 Luis Rodrigues and Martin Dougiamas
+ * @copyright  2016 Ryan Wyllie <ryan@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -26,15 +26,9 @@ require_once(__DIR__ . '/../config.php');
 require_once($CFG->dirroot . '/message/lib.php');
 require_once($CFG->dirroot . '/user/lib.php');
 
-$userid = optional_param('id', 0, PARAM_INT);    // User id.
-$currentuser = true;
-
-if (!$userid) {
-    $userid = $USER->id;
-}
-
-$url = new moodle_url('/message/edit.php');
-$url->param('id', $userid);
+$userid = optional_param('userid', $USER->id, PARAM_INT);    // User id.
+$url = new moodle_url('/message/notificationpreferences.php');
+$url->param('userid', $userid);
 
 $PAGE->set_url($url);
 
@@ -44,9 +38,7 @@ if (isguestuser()) {
     print_error('guestnoeditmessage', 'message');
 }
 
-if (!$user = $DB->get_record('user', array('id' => $userid))) {
-    print_error('invaliduserid');
-}
+$user = $DB->get_record('user', array('id' => $userid), '*', MUST_EXIST);
 
 $systemcontext   = context_system::instance();
 $personalcontext = context_user::instance($user->id);
@@ -54,19 +46,18 @@ $personalcontext = context_user::instance($user->id);
 $PAGE->set_context($personalcontext);
 $PAGE->set_pagelayout('admin');
 
-// check access control
+// Check access control.
 if ($user->id == $USER->id) {
-    //editing own message profile
+    // Editing own message profile.
     require_capability('moodle/user:editownmessageprofile', $systemcontext);
 } else {
-    $currentuser = false;
-    // teachers, parents, etc.
+    // Teachers, parents, etc.
     require_capability('moodle/user:editmessageprofile', $personalcontext);
-    // no editing of guest user account
+    // No editing of guest user account.
     if (isguestuser($user->id)) {
         print_error('guestnoeditmessageother', 'message');
     }
-    // no editing of admins by non admins!
+    // No editing of admins by non admins!
     if (is_siteadmin($user) and !is_siteadmin($USER)) {
         print_error('useradmineditadmin');
     }
@@ -74,21 +65,16 @@ if ($user->id == $USER->id) {
     $PAGE->navigation->extend_for_user($user);
 }
 
-/// Display page header
-$strmessaging = get_string('messagepreferences', 'message');
+// Display page header.
+$strmessaging = get_string('notificationpreferences', 'message');
 $PAGE->set_title($strmessaging);
 $PAGE->set_heading(fullname($user));
 
-echo $OUTPUT->header();
-if ($currentuser) {
-    // Open the message drawer to show the settings.
-    echo $OUTPUT->heading(get_string('messagepreferences', 'core_message'));
-    $PAGE->requires->js_call_amd('core_message/message_drawer_helper', 'showSettings');
-} else {
-    // Viewing another user's preferences so render the old page.
-    $renderer = $PAGE->get_renderer('core', 'message');
-    echo $renderer->render_user_message_preferences($user);
-}
+// Grab the renderer.
+$renderer = $PAGE->get_renderer('core', 'message');
+$messagingoptions = $renderer->render_user_notification_preferences($user);
 
+echo $OUTPUT->header();
+echo $messagingoptions;
 echo $OUTPUT->footer();
 

@@ -15,12 +15,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Content bank and its plugins settings.
+ * Lets users manage data formats
  *
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU Public License
+ * @copyright  2016 Brendan Heywood (brendan@catalyst-au.net)
  * @package    core
- * @subpackage contentbank
- * @copyright  2020 Amaia Anabitarte <amaia@moodle.com>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @subpackage dataformat
  */
 
 require_once('../config.php');
@@ -30,31 +30,31 @@ $action = required_param('action', PARAM_ALPHANUMEXT);
 $name   = required_param('name', PARAM_PLUGIN);
 
 $syscontext = context_system::instance();
-$PAGE->set_url('/admin/contentbank.php');
+$PAGE->set_url('/admin/dataformats.php');
 $PAGE->set_context($syscontext);
 
 require_admin();
 require_sesskey();
 
-$return = new moodle_url('/admin/settings.php', array('section' => 'managecontentbanktypes'));
+$return = new moodle_url('/admin/settings.php', array('section' => 'managedataformats'));
 
-$plugins = core_plugin_manager::instance()->get_plugins_of_type('contenttype');
+$plugins = core_plugin_manager::instance()->get_plugins_of_type('dataformat');
 $sortorder = array_flip(array_keys($plugins));
 
 if (!isset($plugins[$name])) {
-    print_error('contenttypenotfound', 'error', $return, $name);
+    print_error('courseformatnotfound', 'error', $return, $name);
 }
 
 switch ($action) {
     case 'disable':
         if ($plugins[$name]->is_enabled()) {
-            $class = \core_plugin_manager::resolve_plugininfo_class('contenttype');
+            $class = \core_plugin_manager::resolve_plugininfo_class('dataformat');
             $class::enable_plugin($name, false);
         }
         break;
     case 'enable':
         if (!$plugins[$name]->is_enabled()) {
-            $class = \core_plugin_manager::resolve_plugininfo_class('contenttype');
+            $class = \core_plugin_manager::resolve_plugininfo_class('dataformat');
             $class::enable_plugin($name, true);
         }
         break;
@@ -64,8 +64,7 @@ switch ($action) {
             $seq = array_keys($plugins);
             $seq[$currentindex] = $seq[$currentindex - 1];
             $seq[$currentindex - 1] = $name;
-            set_config('contentbank_plugins_sortorder', implode(',', $seq));
-            core_plugin_manager::reset_caches();
+            set_config('dataformat_plugins_sortorder', implode(',', $seq));
         }
         break;
     case 'down':
@@ -74,14 +73,8 @@ switch ($action) {
             $seq = array_keys($plugins);
             $seq[$currentindex] = $seq[$currentindex + 1];
             $seq[$currentindex + 1] = $name;
-            set_config('contentbank_plugins_sortorder', implode(',', $seq));
-            core_plugin_manager::reset_caches();
+            set_config('dataformat_plugins_sortorder', implode(',', $seq));
         }
         break;
 }
-$cache = cache::make('core', 'contentbank_enabled_extensions');
-$cache->purge();
-$cache = cache::make('core', 'contentbank_context_extensions');
-$cache->purge();
-
 redirect($return);
